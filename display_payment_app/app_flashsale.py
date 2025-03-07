@@ -7,16 +7,16 @@ from payos import PayOS, ItemData, PaymentData
 
 load_dotenv()
 
-BASE_ANALYSIS_DIR =r'F:\my_project_payment-gateway\my_project_payment-gateway\data'
-# PAYOS_CLIENT_ID = os.getenv("PAYOS_CLIENT_ID")
-# PAYOS_API_KEY = os.getenv("PAYOS_API_KEY")
-# PAYOS_CHECKSUM_KEY = os.getenv("PAYOS_CHECKSUM_KEY")
-# WEB_DOMAIN = os.getenv("WEB_DOMAIN")
+BASE_ANALYSIS_DIR =r'F:\AI-Payment-Gateway\data'
+PAYOS_CLIENT_ID = os.getenv("PAYOS_CLIENT_ID")
+PAYOS_API_KEY = os.getenv("PAYOS_API_KEY")
+PAYOS_CHECKSUM_KEY = os.getenv("PAYOS_CHECKSUM_KEY")
+WEB_DOMAIN = os.getenv("WEB_DOMAIN")
 
 # PAYOS
-PAYOS_CLIENT_ID='948b7b46-c9df-4655-bb8b-0593f4e5b514'
-PAYOS_API_KEY='5db8cf73-f38f-4907-bdf2-52e8866a6753'
-PAYOS_CHECKSUM_KEY='5aab4966d795069ba4c034d224ca5b11eb613056f48d86e5b64d58fc11cf520b'
+# PAYOS_CLIENT_ID='948b7b46-c9df-4655-bb8b-0593f4e5b514'
+# PAYOS_API_KEY='5db8cf73-f38f-4907-bdf2-52e8866a6753'
+# PAYOS_CHECKSUM_KEY='5aab4966d795069ba4c034d224ca5b11eb613056f48d86e5b64d58fc11cf520b'
 payos = PayOS(PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY)
 WEB_DOMAIN='http://backfriday.beenet.vn'
 

@@ -5,8 +5,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = r'F:\my_project_payment-gateway\my_project_payment-gateway\static\uploads'
-app.config['CSV_FILE'] = r'F:\my_project_payment-gateway\my_project_payment-gateway\data\analysis.csv'
+app.config['UPLOAD_FOLDER'] = r'F:\AI-Payment-Gateway\static\uploads'
+app.config['CSV_FILE'] = r'F:\AI-Payment-Gateway\data\analysis.csv'
 
 # Ensure the upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
