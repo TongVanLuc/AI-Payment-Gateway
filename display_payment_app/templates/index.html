@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Products</title>
+</head>
+<body>
+    <h1>Available Products</h1>
+    {% for product in products %}
+    <div class="product card col-md-4 col-sm-6 mb-4">
+        <!-- Displaying product image from static/uploads directory -->
+        <img src="{{ url_for('static', filename='uploads/' + product['product_name'].replace(' ', '_') + '.jpg') }}" 
+             alt="{{ product['product_name'] }}" 
+             class="card-img-top img-fluid" 
+             style="height: 250px; object-fit: cover;">
+        <div class="card-body">
+            <form action="/payment" method="post">
+                <h5 class="card-title text-truncate" style="max-width: 250px;">{{ product['product_name'] }}</h5>
+                <p class="card-text"><s>{{ product['original_price'] }}</s></p>
+                <h6 class="card-text text-danger mb-3">{{ product['current_price'] }} ₫</h6>
+
+                <input type="hidden" name="product_name" value="{{ product['product_name'] }}">
+                <input type="hidden" name="current_price" value="{{ product['current_price'] }}">
+
+                <button type="submit" id="payment-btn" class="btn btn-success w-100">Mua ngay</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</body>
+</html>
