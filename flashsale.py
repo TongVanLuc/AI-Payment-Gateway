@@ -1,9 +1,13 @@
 import pandas as pd
 import os
 import time
+import sys
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for
+import csv
 from payos import PayOS, ItemData, PaymentData  # Your PayOS API integration
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 load_dotenv()
 BASE_ANALYSIS_DIR = os.getenv('BASE_ANALYSIS_DIR')
@@ -43,8 +47,85 @@ def display_products():
         products = data.to_dict(orient="records")
     except Exception as e:
         return f"An error occurred while processing the file: {e}", 500
+    
+    shopcart = []
+    total_amount = 0
+    try:
+        data = pd.read_csv(os.path.join(BASE_ANALYSIS_DIR, 'shoppingcart.csv'), encoding="utf-8")
+        required_columns = {'product_name', 'original_price', 'discounted_price', 'quantity'}
+        if not required_columns.issubset(data.columns):
+            return "CSV file is missing required columns.", 400
+        shopcart = data.to_dict(orient="records")
 
-    return render_template("index.html", products=products)
+        # tính tổng tiền của giỏ hàng
+        for pro in shopcart:
+            try:
+                price = float(pro['discounted_price'].replace('₫', '').replace('.', '').strip())
+                quantity = float(pro['quantity'])
+                total_amount += price * quantity
+            except Exception as e:
+                print(f"Lỗi xử lý giá sản phẩm {pro}: {e}")
+
+        # Debug: In ra danh sách giỏ hàng
+        print("Dữ liệu giỏ hàng:", shopcart)
+
+    except Exception as e:
+        print("Lỗi đọc file CSV:", e)
+        return "An error occurred while processing the file.", 500
+
+    return render_template("index.html", products=products, shopcart=shopcart, total_amount=total_amount)
+
+@app.route("/addshoppingcart", methods=["POST"])
+def add_to_shopping_cart():
+    # tạo file csv để lưu thông tin hàng
+    cart_file_path = os.path.join(BASE_ANALYSIS_DIR, 'shoppingcart.csv')
+    if not os.path.exists(cart_file_path):
+        with open(cart_file_path, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['product_name', 'original_price', 'discounted_price', 'quantity'])
+
+    # đọc dữ liệu gửi về từ fontend với các thông tin cần
+    data = request.get_json()
+    product_name = data.get("productName")
+    original_price = data.get("originalPrice")
+    discounted_price = data.get("discountedPrice")
+    quantity = data.get("quantity", 1)
+    
+    # nếu hàng đã có trong giỏ hàng thì tăng số lượng sản phẩm lên 1
+    cart_data = pd.read_csv(cart_file_path)
+    if product_name in cart_data['product_name'].values:
+        cart_data.loc[cart_data['product_name'] == product_name, 'quantity'] += quantity
+        cart_data.to_csv(cart_file_path, index=False)
+        return {"success": True, "message": "Product quantity updated in the cart."}, 200
+
+    # thêm thông tin hàng hóa vào file csv
+    with open(cart_file_path, mode='a', newline='', encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow([product_name, original_price, discounted_price, quantity])
+
+    return {"success": True, "message": "Product added to the cart."}, 200
+    
+
+# @app.route("/a", methods=["GET"])
+# def display_shopping_cart():
+#     shopcart = []
+#     try:
+#         data = pd.read_csv(os.path.join(BASE_ANALYSIS_DIR, 'shoppingcart.csv'), encoding="utf-8")
+#         required_columns = {'product_name', 'original_price', 'discounted_price', 'quantity'}
+#         if not required_columns.issubset(data.columns):
+#             return "CSV file is missing required columns.", 400
+#         shopcart = data.to_dict(orient="records")
+
+#         # Debug: In ra danh sách giỏ hàng
+#         print("Dữ liệu giỏ hàng:", shopcart)
+
+#     except Exception as e:
+#         print("Lỗi đọc file CSV:", e)
+#         return "An error occurred while processing the file.", 500
+
+#     return render_template("index.html", shopcart=shopcart)
+  
+
 
 @app.route("/payment", methods=["POST"])
 def create_payment_link():
