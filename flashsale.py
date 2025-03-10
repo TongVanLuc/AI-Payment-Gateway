@@ -21,11 +21,11 @@ payos = PayOS(PAYOS_CLIENT_ID, PAYOS_API_KEY, PAYOS_CHECKSUM_KEY)
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-# Set the uploads folder (used when handling file uploads).
-# IMPORTANT: For serving static files, Flask uses the 'static' folder located relative to your app.
+# Đặt thư mục tải lên (được sử dụng khi xử lý tải lên tệp).
+# QUAN TRỌNG: Để phục vụ các tệp tĩnh, Flask sử dụng thư mục 'static' nằm tương đối với ứng dụng của bạn.
 app.config['UPLOAD_FOLDER'] = r'F:\my_project_payment-gateway\my_project_payment-gateway\static\uploads'
 
-# Ensure that the UPLOAD_FOLDER exists.
+# Đảm bảo rằng UPLOAD_FOLDER tồn tại.
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
@@ -50,12 +50,16 @@ def display_products():
     
     shopcart = []
     total_amount = 0
+    count_product = 0
     try:
         data = pd.read_csv(os.path.join(BASE_ANALYSIS_DIR, 'shoppingcart.csv'), encoding="utf-8")
         required_columns = {'product_name', 'original_price', 'discounted_price', 'quantity'}
         if not required_columns.issubset(data.columns):
             return "CSV file is missing required columns.", 400
         shopcart = data.to_dict(orient="records")
+
+        # tính tổng số lượng sản phẩm trong giỏ hàng
+        count_product = len(shopcart)
 
         # tính tổng tiền của giỏ hàng
         for pro in shopcart:
@@ -73,7 +77,7 @@ def display_products():
         print("Lỗi đọc file CSV:", e)
         return "An error occurred while processing the file.", 500
 
-    return render_template("index.html", products=products, shopcart=shopcart, total_amount=total_amount)
+    return render_template("index.html", products=products, shopcart=shopcart, total_amount=total_amount, count_product=count_product)
 
 @app.route("/addshoppingcart", methods=["POST"])
 def add_to_shopping_cart():
@@ -104,47 +108,74 @@ def add_to_shopping_cart():
         writer.writerow([product_name, original_price, discounted_price, quantity])
 
     return {"success": True, "message": "Product added to the cart."}, 200
-    
-
-# @app.route("/a", methods=["GET"])
-# def display_shopping_cart():
-#     shopcart = []
-#     try:
-#         data = pd.read_csv(os.path.join(BASE_ANALYSIS_DIR, 'shoppingcart.csv'), encoding="utf-8")
-#         required_columns = {'product_name', 'original_price', 'discounted_price', 'quantity'}
-#         if not required_columns.issubset(data.columns):
-#             return "CSV file is missing required columns.", 400
-#         shopcart = data.to_dict(orient="records")
-
-#         # Debug: In ra danh sách giỏ hàng
-#         print("Dữ liệu giỏ hàng:", shopcart)
-
-#     except Exception as e:
-#         print("Lỗi đọc file CSV:", e)
-#         return "An error occurred while processing the file.", 500
-
-#     return render_template("index.html", shopcart=shopcart)
   
-
-
-@app.route("/payment", methods=["POST"])
-def create_payment_link():
+@app.route("/checkout", methods=["POST"])
+def checkout():
     try:
-        # Retrieve product information.
-        product_name = request.form.get("product_name")
-        current_price = int(float(request.form.get("current_price")))
+        # Đọc dữ liệu giỏ hàng từ file CSV
+        cart_file_path = os.path.join(BASE_ANALYSIS_DIR, 'shoppingcart.csv')
+        cart_data = pd.read_csv(cart_file_path)
         
-        # Retrieve buyer information from the form fields.
+        # Lấy thông tin người mua từ các trường biểu mẫu
         buyerName = request.form.get("buyerName")
         buyerEmail = request.form.get("buyerEmail")
         buyerPhone = request.form.get("buyerPhone")
         
-        # Build a raw description including buyerName, buyerPhone, and product_name.
-        # Truncate to 25 characters as required.
+        # Tạo danh sách các mục thanh toán và tính tổng số tiền
+        items = []
+        total_amount = 0
+        for _, row in cart_data.iterrows():
+            item = ItemData(
+                name=row['product_name'],
+                quantity=int(row['quantity']),
+                price=int(float(row['discounted_price'].replace('₫', '').replace('.', '').strip()))
+            )
+            items.append(item)
+            total_amount += item.price * item.quantity
+        
+        # Xây dựng mô tả thô bao gồm tên người mua và điện thoại người mua
+        raw_description = f"{buyerName}-{buyerPhone}-Checkout"
+        description = raw_description[:25]
+        
+        # Tạo dữ liệu thanh toán
+        payment_data = PaymentData(
+            orderCode=int(time.time()),
+            amount=total_amount,
+            description=description,
+            buyerName=buyerName,
+            buyerEmail=buyerEmail,
+            buyerPhone=buyerPhone,
+            items=items,
+            cancelUrl=WEB_DOMAIN,
+            returnUrl=WEB_DOMAIN
+        )
+        
+        # Gọi API PayOS của bạn để tạo liên kết thanh toán
+        payment_link_response = payos.createPaymentLink(payment_data)
+    except Exception as e:
+        return str(e)
+    
+    # Chuyển hướng người dùng ngay lập tức đến URL thanh toán
+    return redirect(payment_link_response.checkoutUrl)
+
+@app.route("/payment", methods=["POST"])
+def create_payment_link():
+    try:
+        # Lấy thông tin sản phẩm.
+        product_name = request.form.get("product_name")
+        current_price = int(float(request.form.get("current_price")))
+        
+        # Lấy thông tin người mua từ các trường biểu mẫu.
+        buyerName = request.form.get("buyerName")
+        buyerEmail = request.form.get("buyerEmail")
+        buyerPhone = request.form.get("buyerPhone")
+        
+        # Xây dựng mô tả thô bao gồm tên người mua, điện thoại người mua và tên sản phẩm.
+        # Cắt bớt còn 25 ký tự nếu cần.
         raw_description = f"{buyerName}-{buyerPhone}-{product_name}"
         description = raw_description[:25]
         
-        # Create the payment item and payment data.
+        # Tạo mục thanh toán và dữ liệu thanh toán.
         item = ItemData(name=product_name, quantity=1, price=current_price)
         payment_data = PaymentData(
             orderCode=int(time.time()),
@@ -158,15 +189,15 @@ def create_payment_link():
             returnUrl=WEB_DOMAIN
         )
         
-        # Call your PayOS API to create a payment link.
+        # Gọi API PayOS của bạn để tạo liên kết thanh toán.
         payment_link_response = payos.createPaymentLink(payment_data)
     except Exception as e:
         return str(e)
     
-    # Immediately redirect the user to the checkout URL.
+    # Chuyển hướng người dùng ngay lập tức đến URL thanh toán.
     return redirect(payment_link_response.checkoutUrl)
 
-# (Optional) Debug route to list files in your uploads folder
+# (Tùy chọn) Lộ trình gỡ lỗi để liệt kê các tệp trong thư mục tải lên của bạn
 @app.route("/check_uploads")
 def check_uploads():
     try:
